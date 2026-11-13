@@ -6,6 +6,7 @@ on:
       - '.github/workflows/build-firmware.yml'
       - 'README.md'
       - 'companion/**'
+      - 'scripts/**'
 permissions:
   contents: read
 jobs:
@@ -28,8 +29,7 @@ jobs:
           target: esp32s3
           path: upstream/firmware
           command: |
-            cp "$GITHUB_WORKSPACE/companion/companion_core.h" main/apps/app_ai_agent/companion_core.h
-            cp "$GITHUB_WORKSPACE/companion/app_ai_agent.cpp" main/apps/app_ai_agent/app_ai_agent.cpp
+            python3 "$GITHUB_WORKSPACE/scripts/apply_companion.py"
             python3 fetch_repos.py
             idf.py build
       - name: Upload flashable build outputs
