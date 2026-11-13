@@ -85,6 +85,12 @@ display_source=display_source.replace(emotion_needle,emotion_needle+'''
         auto& companion = ahl::getCompanion();
         if (strcmp(emotion, "happy") == 0 || strcmp(emotion, "laughing") == 0) {
             companion.setMood(ahl::Mood::Happy);
+            // Xiaozhi's actual emotion event also drives the physical servos.
+            auto& robot = GetStackChan();
+            if (robot.hasAvatar() && !robot.motion().isMoving() &&
+                !robot.motion().isModifyLocked()) {
+                robot.motion().lookAtNormalized(0.18f, -0.15f, 220);
+            }
         } else if (strcmp(emotion, "sad") == 0 || strcmp(emotion, "crying") == 0) {
             companion.setMood(ahl::Mood::Concerned);
         } else if (strcmp(emotion, "doubtful") == 0) {
