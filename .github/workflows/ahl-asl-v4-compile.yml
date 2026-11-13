@@ -1,7 +1,7 @@
-name: AHL ASL Companion v4 full ESP32-S3 firmware
+name: AHL ASL Companion v5 conversation and memory
 on:
   push:
-    branches: [ahl/asl-v4-assets-ai-integration-20261113]
+    branches: [ahl/asl-v5-conversation-memory-20261113]
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,11 +29,15 @@ jobs:
             echo "Build working directory: $(pwd)"
             test -f ../../scripts/apply_companion.py
             test -f ../../scripts/integrate_asl_v4.py
+            test -f ../../scripts/extend_asl.py
             python3 ../../scripts/apply_companion.py
             python3 ../../scripts/integrate_asl_v4.py
+            python3 ../../scripts/extend_asl.py
             grep -q "AHL_COMPANION_V1_ACTIVE" main/apps/app_ai_agent/app_ai_agent.cpp
             grep -q "AppAslCompanion" main/main.cpp
             test -s main/apps/app_asl_companion/asl_face_data.inc
+            grep -q 'auto_listen_enabled' main/apps/app_asl_companion/asl_live_mode.cpp
+            grep -q 'ahl.memory.search' main/hal/hal.cpp
             python3 fetch_repos.py
             idf.py build
       - name: Verify flash image and fit in existing OTA app partition
@@ -57,7 +61,7 @@ jobs:
       - name: Upload full non-flashed firmware files
         uses: actions/upload-artifact@v4
         with:
-          name: AHL-StackChan-ASL-v4-with-existing-brain
+          name: AHL-StackChan-ASL-v5-voice-face-memory
           path: |
             upstream/firmware/build/*.bin
             upstream/firmware/build/flash_args
