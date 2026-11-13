@@ -25,8 +25,15 @@ jobs:
           target: esp32s3
           path: upstream/firmware
           command: |
-            python3 "$GITHUB_WORKSPACE/scripts/apply_companion.py"
-            python3 "$GITHUB_WORKSPACE/scripts/integrate_asl_v4.py"
+            set -euo pipefail
+            echo "Build working directory: $(pwd)"
+            test -f ../../scripts/apply_companion.py
+            test -f ../../scripts/integrate_asl_v4.py
+            python3 ../../scripts/apply_companion.py
+            python3 ../../scripts/integrate_asl_v4.py
+            grep -q "AHL_COMPANION_V1_ACTIVE" main/apps/app_ai_agent/app_ai_agent.cpp
+            grep -q "AppAslCompanion" main/main.cpp
+            test -s main/apps/app_asl_companion/asl_face_data.inc
             python3 fetch_repos.py
             idf.py build
       - name: Verify flash image and fit in existing OTA app partition
