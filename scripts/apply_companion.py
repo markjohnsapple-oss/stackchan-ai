@@ -54,10 +54,10 @@ display=root/"upstream/firmware/main/hal/board/stackchan_display.cc"
 if not display.exists():
     raise SystemExit(f"ERROR: missing Xiaozhi display: {display}")
 display_source=display.read_text()
-status_needle='void StackChanAvatarDisplay::SetStatus(const char* status)\\n{'
+status_needle='void StackChanAvatarDisplay::SetStatus(const char* status)\n{'
 if display_source.count(status_needle)!=1:
     raise SystemExit("ERROR: unexpected Xiaozhi status handler")
-display_source=display_source.replace('#include <hal/hal.h>', '#include <hal/hal.h>\\n#include <hal/companion_core.h>')
+display_source=display_source.replace('#include <hal/hal.h>', '#include <hal/hal.h>\n#include <hal/companion_core.h>')
 display_source=display_source.replace(status_needle,status_needle+'''
     if (status) {
         auto& companion = ahl::getCompanion();
