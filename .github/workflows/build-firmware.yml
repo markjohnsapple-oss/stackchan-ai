@@ -1,0 +1,43 @@
+name: Build StackChan firmware
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-firmware.yml'
+      - 'README.md'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout AHL build configuration
+        uses: actions/checkout@v4
+      - name: Checkout verified StackChan source revision
+        uses: actions/checkout@v4
+        with:
+          repository: m5stack/StackChan
+          ref: 28b9f0c8bd6acd81cb3c70f1a93c3e373b39d400
+          path: upstream
+      - name: Install ESP-IDF 6.1
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: upstream/firmware
+          command: |
+            python3 fetch_repos.py
+            idf.py build
+      - name: Upload flashable build outputs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stackchan-firmware-build
+          path: |
+            upstream/firmware/build/*.bin
+            upstream/firmware/build/flash_args
+            upstream/firmware/build/flasher_args.json
+            upstream/firmware/build/bootloader/*.bin
+            upstream/firmware/build/partition_table/*.bin
+          if-no-files-found: error
