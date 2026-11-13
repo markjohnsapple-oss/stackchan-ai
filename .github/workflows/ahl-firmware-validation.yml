@@ -1,0 +1,50 @@
+name: AHL StackChan firmware build validation
+on:
+  push:
+    branches:
+      - ahl/asl-v4-firmware-validation-20261113
+    paths:
+      - .github/workflows/ahl-firmware-validation.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout user's current companion source
+        uses: actions/checkout@v4
+      - name: Checkout official StackChan v1.6.2 source
+        uses: actions/checkout@v4
+        with:
+          repository: m5stack/StackChan
+          ref: 28b9f0c8bd6acd81cb3c70f1a93c3e373b39d400
+          path: upstream
+      - name: Install ESP-IDF 6.1, apply existing companion branch and build
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: upstream/firmware
+          command: |
+            python3 "$GITHUB_WORKSPACE/scripts/apply_companion.py"
+            python3 fetch_repos.py
+            idf.py build
+      - name: Verify flash image and manifest
+        shell: bash
+        run: |
+          test -s upstream/firmware/build/stack-chan.bin
+          test -s upstream/firmware/build/flasher_args.json
+          sha256sum upstream/firmware/build/stack-chan.bin
+      - name: Upload firmware build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AHL-StackChan-firmware-existing-brain-validation
+          path: |
+            upstream/firmware/build/*.bin
+            upstream/firmware/build/flash_args
+            upstream/firmware/build/flasher_args.json
+            upstream/firmware/build/bootloader/*.bin
+            upstream/firmware/build/partition_table/*.bin
+          if-no-files-found: error
