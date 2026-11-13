@@ -18,7 +18,7 @@ original.write_text(text)
 shutil.copyfile(root/"companion/companion_core.h",target/"companion_core.h")
 # Explicit marker in the compiled AI agent so builds can be distinguished.
 text=original.read_text().replace('#include "app_ai_agent.h"','#include "app_ai_agent.h"\n#include "companion_core.h"')
-text=text.replace('    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");','    static ahl::CompanionCore companion;\n    companion.setState(ahl::State::Listening);\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");')
+text=text.replace('    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");','    static ahl::CompanionCore companion;\n    static ahl::CompanionMemory memory;\n    static bool memory_ready = memory.load();\n    if (memory_ready) memory.recordVisit();\n    companion.setState(ahl::State::Listening);\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");')
 original.write_text(text)
 # Enable AI-on-boot by default for fresh configurations, while retaining
 # existing persisted user settings and the existing Xiaozhi implementation.
