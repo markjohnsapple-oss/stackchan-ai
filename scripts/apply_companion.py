@@ -77,7 +77,7 @@ display_source=display_source.replace(status_needle,status_needle+'''
     }
 ''')
 # Map the real cloud emotion output to the companion's adaptive mood.
-emotion_needle='void StackChanAvatarDisplay::SetEmotion(const char* emotion)\\n{'
+emotion_needle='void StackChanAvatarDisplay::SetEmotion(const char* emotion)\n{'
 if display_source.count(emotion_needle)!=1:
     raise SystemExit("ERROR: unexpected emotion handler")
 display_source=display_source.replace(emotion_needle,emotion_needle+'''
