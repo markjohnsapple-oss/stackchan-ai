@@ -18,7 +18,7 @@ original.write_text(text)
 shutil.copyfile(root/"companion/companion_core.h",target/"companion_core.h")
 # Explicit marker in the compiled AI agent so builds can be distinguished.
 text=original.read_text().replace('#include "app_ai_agent.h"','#include "app_ai_agent.h"\n#include "companion_core.h"')
-text=text.replace('    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");','    static ahl::CompanionCore companion;\n    static bool memory_ready = companion.openMemory();\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_MEMORY_READY={}", memory_ready);\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");')
+text=text.replace('    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");','    auto& companion = ahl::getCompanion();\n    static bool memory_ready = companion.openMemory();\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_MEMORY_READY={}", memory_ready);\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");')
 original.write_text(text)
 hal=root/"upstream/firmware/main/hal/hal.cpp"
 if not hal.exists():
@@ -28,7 +28,14 @@ start_marker='void Hal::startXiaozhi()\n{'
 if hal_source.count(start_marker)!=1:
     raise SystemExit("ERROR: unexpected startup function")
 hal_source=hal_source.replace('#include "hal.h"', '#include "hal.h"\n#include "companion_core.h"')
-hal_source=hal_source.replace(start_marker,start_marker+'\n    static ahl::CompanionCore ahl_memory;\n    const bool ahl_memory_ready = ahl_memory.openMemory();\n    if (ahl_memory_ready) ahl_memory.recordVisit();\n    mclog::tagInfo(_tag, "AHL_COMPANION_BOOT visits={}", ahl_memory.visits());')
+hal_source=hal_source.replace('static std::unique_ptr<Hal> _hal_instance;', '''namespace ahl {
+CompanionCore& getCompanion() {
+    static CompanionCore companion;
+    return companion;
+}
+}
+static std::unique_ptr<Hal> _hal_instance;''')
+hal_source=hal_source.replace(start_marker,start_marker+'\n    auto& ahl_memory = ahl::getCompanion();\n    const bool ahl_memory_ready = ahl_memory.openMemory();\n    if (ahl_memory_ready) ahl_memory.recordVisit();\n    mclog::tagInfo(_tag, "AHL_COMPANION_BOOT visits={}", ahl_memory.visits());')
 hal.write_text(hal_source)
 shutil.copyfile(root/"companion/companion_core.h",root/"upstream/firmware/main/hal/companion_core.h")
 # Enable AI-on-boot by default for fresh configurations, while retaining
@@ -41,4 +48,33 @@ setting="bool startAiAgentOnBoot          = false;"
 if bridge_source.count(setting)!=1:
     raise SystemExit("ERROR: unexpected HAL bridge setting; refusing to modify")
 bridge.write_text(bridge_source.replace(setting,"bool startAiAgentOnBoot          = true;"))
+
+# Synchronise the companion with real Xiaozhi listening/speaking events.
+display=root/"upstream/firmware/main/hal/board/stackchan_display.cc"
+if not display.exists():
+    raise SystemExit(f"ERROR: missing Xiaozhi display: {display}")
+display_source=display.read_text()
+status_needle='void StackChanAvatarDisplay::SetStatus(const char* status)\\n{'
+if display_source.count(status_needle)!=1:
+    raise SystemExit("ERROR: unexpected Xiaozhi status handler")
+display_source=display_source.replace('#include <hal/hal.h>', '#include <hal/hal.h>\\n#include <hal/companion_core.h>')
+display_source=display_source.replace(status_needle,status_needle+'''
+    if (status) {
+        auto& companion = ahl::getCompanion();
+        const uint32_t now = GetHAL().millis();
+        if (strcmp(status, Lang::Strings::LISTENING) == 0) {
+            companion.speechStarted(now);
+        } else if (strcmp(status, Lang::Strings::SPEAKING) == 0) {
+            companion.responseStarted(now);
+        } else if (strcmp(status, Lang::Strings::STANDBY) == 0) {
+            if (companion.state() == ahl::State::Speaking) {
+                companion.responseEnded(now);
+                companion.saveTurnCount();
+            } else if (companion.state() == ahl::State::Listening) {
+                companion.speechEnded(now);
+            }
+        }
+    }
+''')
+display.write_text(display_source)
 print("AHL companion patch applied to",original,"and AI-on-boot default enabled")
