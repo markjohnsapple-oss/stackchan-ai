@@ -36,6 +36,35 @@ CompanionCore& getCompanion() {
 }
 static std::unique_ptr<Hal> _hal_instance;''')
 hal_source=hal_source.replace(start_marker,start_marker+'\n    auto& ahl_memory = ahl::getCompanion();\n    const bool ahl_memory_ready = ahl_memory.openMemory();\n    if (ahl_memory_ready) ahl_memory.recordVisit();\n    mclog::tagInfo(_tag, "AHL_COMPANION_BOOT visits={}", ahl_memory.visits());')
+# Background camera watcher feeds actual frame-change events to the companion.
+# No camera preview, shutter sound or network upload is initiated.
+watcher=r'''
+static void _ahl_presence_task(void*) {
+    auto* camera=hal_bridge::board_get_camera();
+    if (!camera) { vTaskDelete(nullptr); return; }
+    unsigned moving=0, still=0;
+    while (true) {
+        vTaskDelay(pdMS_TO_TICKS(2500));
+        if (!hal_bridge::is_xiaozhi_ready()) continue;
+        float delta=0;
+        if (!camera->SamplePresenceMotion(&delta)) continue;
+        if (delta>0.11f) { moving++; still=0; }
+        else { still++; moving=0; }
+        auto& companion=ahl::getCompanion();
+        const uint32_t now=GetHAL().millis();
+        if (moving>=2) companion.onPresence(true,now);
+        if (still>=12) companion.onPresence(false,now);
+        if (companion.shouldGreet(now)) {
+            companion.markGreeted(now);
+            mclog::tagInfo(_tag,"AHL_CAMERA_PRESENCE_GREETING_ELIGIBLE");
+            // No synthetic speech: the Xiaozhi cloud conversation must be
+            // explicitly invoked through a supported conversation API.
+        }
+    }
+}
+'''
+hal_source=hal_source.replace(start_marker,watcher+'\\n'+start_marker)
+hal_source=hal_source.replace('    auto& ahl_memory = ahl::getCompanion();','    xTaskCreate(_ahl_presence_task,"ahl_presence",6144,nullptr,2,nullptr);\\n    auto& ahl_memory = ahl::getCompanion();')
 hal.write_text(hal_source)
 shutil.copyfile(root/"companion/companion_core.h",root/"upstream/firmware/main/hal/companion_core.h")
 # Enable AI-on-boot by default for fresh configurations, while retaining
