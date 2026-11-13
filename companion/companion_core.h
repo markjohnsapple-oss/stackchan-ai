@@ -109,4 +109,5 @@ private:
     uint32_t visits_=0,turns_=0,saved_turns_=0;
     std::string memory_;
 };
+CompanionCore& getCompanion();
 } // namespace ahl
