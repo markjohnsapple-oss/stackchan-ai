@@ -54,17 +54,22 @@ static void _ahl_presence_task(void*) {
         const uint32_t now=GetHAL().millis();
         if (moving>=2) companion.onPresence(true,now);
         if (still>=12) companion.onPresence(false,now);
+        if (companion.proactiveDue(now, false) && hal_bridge::is_xiaozhi_idle()) {
+            companion.markProactive(now);
+            hal_bridge::toggle_xiaozhi_chat_state();
+        }
         if (companion.shouldGreet(now)) {
             companion.markGreeted(now);
-            mclog::tagInfo(_tag,"AHL_CAMERA_PRESENCE_GREETING_ELIGIBLE");
+            mclog::tagInfo(_tag,"AHL_CAMERA_PRESENCE_GREETING_START");
+            if (hal_bridge::is_xiaozhi_idle()) hal_bridge::toggle_xiaozhi_chat_state();
             // No synthetic speech: the Xiaozhi cloud conversation must be
             // explicitly invoked through a supported conversation API.
         }
     }
 }
 '''
-hal_source=hal_source.replace(start_marker,watcher+'\\n'+start_marker)
-hal_source=hal_source.replace('    auto& ahl_memory = ahl::getCompanion();','    xTaskCreate(_ahl_presence_task,"ahl_presence",6144,nullptr,2,nullptr);\\n    auto& ahl_memory = ahl::getCompanion();')
+hal_source=hal_source.replace(start_marker,watcher+'\n'+start_marker)
+hal_source=hal_source.replace('    auto& ahl_memory = ahl::getCompanion();','    xTaskCreate(_ahl_presence_task,"ahl_presence",6144,nullptr,2,nullptr);\n    auto& ahl_memory = ahl::getCompanion();')
 hal.write_text(hal_source)
 shutil.copyfile(root/"companion/companion_core.h",root/"upstream/firmware/main/hal/companion_core.h")
 # Enable AI-on-boot by default for fresh configurations, while retaining
