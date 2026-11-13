@@ -27,7 +27,7 @@ hal_source=hal.read_text()
 start_marker='void Hal::startXiaozhi()\n{'
 if hal_source.count(start_marker)!=1:
     raise SystemExit("ERROR: unexpected startup function")
-hal_source=hal_source.replace('#include "hal.h"', '#include "hal.h"\n#include "companion_core.h"')
+hal_source=hal_source.replace('#include "hal.h"', '#include "hal.h"\n#include "companion_core.h"\n#include "companion_brain.h"')
 hal_source=hal_source.replace('static std::unique_ptr<Hal> _hal_instance;', '''namespace ahl {
 CompanionCore& getCompanion() {
     static CompanionCore companion;
@@ -43,6 +43,7 @@ static void _ahl_presence_task(void*) {
     auto* camera=hal_bridge::board_get_camera();
     if (!camera) { vTaskDelete(nullptr); return; }
     unsigned moving=0, still=0;
+    ahl::CompanionBrain brain;
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(2500));
         if (!hal_bridge::is_xiaozhi_ready()) continue;
@@ -52,18 +53,15 @@ static void _ahl_presence_task(void*) {
         else { still++; moving=0; }
         auto& companion=ahl::getCompanion();
         const uint32_t now=GetHAL().millis();
-        if (moving>=2) companion.onPresence(true,now);
-        if (still>=12) companion.onPresence(false,now);
-        if (companion.proactiveDue(now, false) && hal_bridge::is_xiaozhi_idle()) {
-            companion.markProactive(now);
-            hal_bridge::toggle_xiaozhi_chat_state();
-        }
-        if (companion.shouldGreet(now)) {
-            companion.markGreeted(now);
-            mclog::tagInfo(_tag,"AHL_CAMERA_PRESENCE_GREETING_START");
-            if (hal_bridge::is_xiaozhi_idle()) hal_bridge::toggle_xiaozhi_chat_state();
-            // No synthetic speech: the Xiaozhi cloud conversation must be
-            // explicitly invoked through a supported conversation API.
+        if (moving>=2) { companion.onPresence(true,now); brain.presenceChanged(true,now); }
+        if (still>=12) { companion.onPresence(false,now); brain.presenceChanged(false,now); }
+        // Decisions are recorded but not misrepresented as spoken responses.
+        // Xiaozhi needs a confirmed text-to-speech conversation transport.
+        const ahl::BrainInput input{now, moving>=2 || still<12,
+            hal_bridge::is_xiaozhi_ready(), hal_bridge::is_xiaozhi_idle(), false};
+        const auto action=brain.decide(input);
+        if (action!=ahl::BrainAction::None) {
+            mclog::tagInfo(_tag,"AHL_BRAIN_ACTION_PENDING={}",static_cast<int>(action));
         }
     }
 }
@@ -72,6 +70,7 @@ hal_source=hal_source.replace(start_marker,watcher+'\n'+start_marker)
 hal_source=hal_source.replace('    auto& ahl_memory = ahl::getCompanion();','    xTaskCreate(_ahl_presence_task,"ahl_presence",6144,nullptr,2,nullptr);\n    auto& ahl_memory = ahl::getCompanion();')
 hal.write_text(hal_source)
 shutil.copyfile(root/"companion/companion_core.h",root/"upstream/firmware/main/hal/companion_core.h")
+shutil.copyfile(root/"companion/companion_brain.h",root/"upstream/firmware/main/hal/companion_brain.h")
 # Enable AI-on-boot by default for fresh configurations, while retaining
 # existing persisted user settings and the existing Xiaozhi implementation.
 bridge=root/"upstream/firmware/main/hal/board/hal_bridge.h"
