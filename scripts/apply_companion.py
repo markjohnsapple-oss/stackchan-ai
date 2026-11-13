@@ -101,4 +101,46 @@ display_source=display_source.replace(emotion_needle,emotion_needle+'''
     }
 ''')
 display.write_text(display_source)
-print("AHL companion patch applied to",original,"and AI-on-boot default enabled")
+
+# Camera motion sampling uses the real camera without shutter audio or preview.
+# It is a movement cue, not facial or person recognition.
+camera_header=root/"upstream/firmware/main/hal/board/stackchan_camera.h"
+camera_source=camera_header.read_text()
+camera_anchor="    bool StreamCaptures();"
+if camera_source.count(camera_anchor)!=1:
+    raise SystemExit("ERROR: unexpected camera header")
+camera_source=camera_source.replace(camera_anchor,camera_anchor+'''
+    // Low-rate background sampling, preserving the existing capture lock.
+    bool SamplePresenceMotion(float* change) {
+        if (!change || !StreamCaptures()) return false;
+        auto lock = TryLockFrame();
+        if (!lock.owns_lock() || !frame_.data || frame_.len < 512) return false;
+        // Compare stable positions in successive raw camera frames.
+        // Encoded formats are deliberately excluded to avoid false detection.
+        if (frame_.format != V4L2_PIX_FMT_RGB565 &&
+            frame_.format != V4L2_PIX_FMT_YUYV) return false;
+        constexpr size_t kSamples = 128;
+        uint8_t current[kSamples];
+        for (size_t i=0;i<kSamples;++i) current[i]=frame_.data[(i*frame_.len/kSamples)&~size_t(1)];
+        if (!sample_ready_) {
+            memcpy(previous_sample_,current,kSamples);
+            sample_ready_=true;
+            return false;
+        }
+        unsigned sum=0;
+        for (size_t i=0;i<kSamples;++i) {
+            sum += current[i]>previous_sample_[i] ?
+                current[i]-previous_sample_[i] : previous_sample_[i]-current[i];
+        }
+        memcpy(previous_sample_,current,kSamples);
+        *change=static_cast<float>(sum)/(kSamples*255.0f);
+        return true;
+    }
+private:
+    uint8_t previous_sample_[128] = {};
+    bool sample_ready_ = false;
+public:
+''')
+camera_source=camera_source.replace('#include "esp_video.h"','#include "esp_video.h"\n#include <cstring>\n#include <linux/videodev2.h>')
+camera_header.write_text(camera_source)
+\nprint("AHL companion patch applied to",original,"and AI-on-boot default enabled")
