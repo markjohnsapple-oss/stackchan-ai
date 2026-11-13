@@ -76,5 +76,23 @@ display_source=display_source.replace(status_needle,status_needle+'''
         }
     }
 ''')
+# Map the real cloud emotion output to the companion's adaptive mood.
+emotion_needle='void StackChanAvatarDisplay::SetEmotion(const char* emotion)\\n{'
+if display_source.count(emotion_needle)!=1:
+    raise SystemExit("ERROR: unexpected emotion handler")
+display_source=display_source.replace(emotion_needle,emotion_needle+'''
+    if (emotion) {
+        auto& companion = ahl::getCompanion();
+        if (strcmp(emotion, "happy") == 0 || strcmp(emotion, "laughing") == 0) {
+            companion.setMood(ahl::Mood::Happy);
+        } else if (strcmp(emotion, "sad") == 0 || strcmp(emotion, "crying") == 0) {
+            companion.setMood(ahl::Mood::Concerned);
+        } else if (strcmp(emotion, "doubtful") == 0) {
+            companion.setMood(ahl::Mood::Curious);
+        } else {
+            companion.setMood(ahl::Mood::Calm);
+        }
+    }
+''')
 display.write_text(display_source)
 print("AHL companion patch applied to",original,"and AI-on-boot default enabled")
