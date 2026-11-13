@@ -12,7 +12,7 @@ namespace ahl {
 class VectorNoteIndex {
 public:
     static constexpr size_t Dim = 64;
-    static constexpr size_t MaxNotes = 16;
+    static constexpr size_t MaxNotes = 32;
     static constexpr size_t MaxTextBytes = 160;
     struct Match { std::string text; float similarity = 0.f; bool found = false; };
 

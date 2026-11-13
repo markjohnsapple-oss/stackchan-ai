@@ -19,7 +19,9 @@ public:
         if (lowered == "forget all companion memories" ||
             lowered == "forget everything i taught you") return eraseAll();
         const char* prefixes[] = {"remember that ", "please remember that ",
-                                  "please remember ", "remember "};
+                                  "please remember ", "remember ",
+                                  "learn that ", "please learn that ",
+                                  "teach you that "};
         size_t prefix=0;
         for (const char* p:prefixes) {
             const std::string candidate=p;
