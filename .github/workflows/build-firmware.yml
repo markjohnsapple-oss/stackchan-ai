@@ -1,12 +1,6 @@
 name: Build StackChan firmware
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/build-firmware.yml'
-      - 'README.md'
-      - 'companion/**'
-      - 'scripts/**'
 permissions:
   contents: read
 jobs:
