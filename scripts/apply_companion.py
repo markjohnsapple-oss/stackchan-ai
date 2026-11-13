@@ -176,4 +176,4 @@ public:
 ''')
 camera_source=camera_source.replace('#include "esp_video.h"','#include "esp_video.h"\n#include <cstring>\n#include <linux/videodev2.h>')
 camera_header.write_text(camera_source)
-\nprint("AHL companion patch applied to",original,"and AI-on-boot default enabled")
+print("AHL companion patch applied to",original,"and AI-on-boot default enabled")
