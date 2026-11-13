@@ -18,7 +18,7 @@ original.write_text(text)
 shutil.copyfile(root/"companion/companion_core.h",target/"companion_core.h")
 # Explicit marker in the compiled AI agent so builds can be distinguished.
 text=original.read_text().replace('#include "app_ai_agent.h"','#include "app_ai_agent.h"\n#include "companion_core.h"')
-text=text.replace('    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");','    static ahl::CompanionCore companion;\n    static ahl::CompanionCore companion_memory;\n    static bool memory_ready = companion_memory.openMemory();\n    if (memory_ready) companion_memory.recordVisit();\n    companion.setState(ahl::State::Listening);\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");')
+text=text.replace('    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");','    static ahl::CompanionCore companion;\n    static bool memory_ready = companion.openMemory();\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_MEMORY_READY={}", memory_ready);\n    mclog::tagInfo(getAppInfo().name, "AHL_COMPANION_V1_ACTIVE");')
 original.write_text(text)
 hal=root/"upstream/firmware/main/hal/hal.cpp"
 if not hal.exists():
