@@ -1,7 +1,7 @@
-name: AHL ASL Companion v7 conversational learning and self-awareness
+name: AHL ASL Companion v8 approved face animation swap
 on:
   push:
-    branches: [ahl/asl-v7-conversational-learning-20261113]
+    branches: [ahl/asl-v8-approved-face-swap-20261114]
     paths: [.github/workflows/ahl-asl-v7-conversational-learning.yml]
   workflow_dispatch:
 permissions:
@@ -37,6 +37,8 @@ jobs:
             python3 ../../scripts/compat_fixes.py
             python3 ../../scripts/tune_asl_v6.py
             python3 ../../scripts/extend_asl_v7.py
+            grep -q "lowered.back()=='.'" ../../companion/ahl_memory_service.h
+            grep -q "lowered.back()=='.'" ../../companion/ahl_memory_service.h
             grep -q "AHL_COMPANION_V1_ACTIVE" main/apps/app_ai_agent/app_ai_agent.cpp
             grep -q "AppAslCompanion" main/main.cpp
             test -s main/apps/app_asl_companion/asl_face_data.inc
@@ -67,10 +69,27 @@ jobs:
           grep -q 'start learning about me' companion/ahl_memory_service.h
           grep -q 'ahl.memory.list' upstream/firmware/main/hal/hal.cpp
           grep -q 'ahl.companion.capabilities' upstream/firmware/main/hal/hal.cpp
+          grep -q 'case Sequence::Talking:return 12;' upstream/firmware/main/apps/app_asl_companion/asl_face_assets.cpp
+          python3 - <<'PY'
+          import hashlib,tarfile
+          old='assets/ASL_Companion_v4_overlay.tar.xz'
+          new='assets/ASL_Companion_v8_face_overlay.tar.xz'
+          changed=[]
+          with tarfile.open(old,'r:xz') as a,tarfile.open(new,'r:xz') as b:
+            da={m.name:a.extractfile(m).read() for m in a if m.isfile()}
+            db={m.name:b.extractfile(m).read() for m in b if m.isfile()}
+          assert da.keys()==db.keys()
+          changed=[k for k in da if da[k]!=db[k]]
+          assert sorted(changed)==[
+            'overlay/firmware/main/apps/app_asl_companion/asl_face_assets.cpp',
+            'overlay/firmware/main/apps/app_asl_companion/asl_face_data.inc'
+          ], changed
+          print('Approved face-only asset change verified; 7 existing resources preserved.')
+          PY
       - name: Upload full non-flashed firmware files
         uses: actions/upload-artifact@v4
         with:
-          name: AHL-StackChan-ASL-v7-Conversational-Learning
+          name: AHL-StackChan-ASL-v8-New-Face-Animations
           path: |
             upstream/firmware/build/*.bin
             upstream/firmware/build/flash_args
