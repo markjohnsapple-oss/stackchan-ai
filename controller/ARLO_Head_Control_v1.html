@@ -115,7 +115,7 @@ function position(event){
 }
 pad.addEventListener('pointerdown',ev=>{
  if(!paired){setStatus('Pair ARLO first.');return;}
- active=true;moving=true;pad.classList.add('active');pad.setPointerCapture(ev.pointerId);position(ev);move(true);
+ active=true;moving=true;pad.classList.add('active');pad.setPointerCapture(ev.pointerId);position(ev);
 });
 pad.addEventListener('pointermove',ev=>{if(active)position(ev);});
 pad.addEventListener('pointerup',stop);pad.addEventListener('pointercancel',stop);
