@@ -125,7 +125,7 @@ def patch():
     for label, marker in {
         "native v2 handsfree retained": "ahl_handsfree_enabled_",
         "manual tap-to-pause retained": 'Mic paused: tap face to resume',
-        "native vision unchanged": "camera",
+        "native MCP camera integration unchanged": "McpServer::GetInstance()",
         "original VAD retained": "audio_service_.IsVoiceDetected()",
         "bounded refresh": "kArloSilentRefreshUs",
         "ARLO diagnostic": "ARLO_SILENCE",
