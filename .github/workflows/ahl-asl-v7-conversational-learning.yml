@@ -37,6 +37,7 @@ jobs:
             python3 ../../scripts/compat_fixes.py
             python3 ../../scripts/tune_asl_v6.py
             python3 ../../scripts/extend_asl_v7.py
+            grep -q "lowered.back()=='.'" ../../companion/ahl_memory_service.h
             grep -q "AHL_COMPANION_V1_ACTIVE" main/apps/app_ai_agent/app_ai_agent.cpp
             grep -q "AppAslCompanion" main/main.cpp
             test -s main/apps/app_asl_companion/asl_face_data.inc
