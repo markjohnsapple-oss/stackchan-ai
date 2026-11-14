@@ -1,0 +1,98 @@
+name: AHL ASL Companion v8 approved face animation swap
+on:
+  push:
+    branches: [ahl/asl-v8-approved-face-swap-20261114]
+    paths: [.github/workflows/ahl-asl-v8-face-swap.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout protected AHL integration branch
+        uses: actions/checkout@v4
+      - name: Checkout exact official StackChan 1.6.2
+        uses: actions/checkout@v4
+        with:
+          repository: m5stack/StackChan
+          ref: 28b9f0c8bd6acd81cb3c70f1a93c3e373b39d400
+          path: upstream
+      - name: Build existing brain plus approved ASL graphics and greeting
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: upstream/firmware
+          command: |
+            set -euo pipefail
+            echo "Build working directory: $(pwd)"
+            test -f ../../scripts/apply_companion.py
+            test -f ../../scripts/integrate_asl_v4.py
+            test -f ../../scripts/extend_asl.py
+            python3 ../../scripts/apply_companion.py
+            python3 ../../scripts/integrate_asl_v4.py
+            python3 ../../scripts/extend_asl.py
+            python3 ../../scripts/compat_fixes.py
+            python3 ../../scripts/tune_asl_v6.py
+            python3 ../../scripts/extend_asl_v7.py
+            grep -q "lowered.back()=='.'" ../../companion/ahl_memory_service.h
+            grep -q "AHL_COMPANION_V1_ACTIVE" main/apps/app_ai_agent/app_ai_agent.cpp
+            grep -q "AppAslCompanion" main/main.cpp
+            test -s main/apps/app_asl_companion/asl_face_data.inc
+            grep -q 'auto_listen_enabled' main/apps/app_asl_companion/asl_live_mode.cpp
+            grep -q 'ahl.memory.search' main/hal/hal.cpp
+            python3 fetch_repos.py
+            idf.py build
+      - name: Verify flash image and fit in existing OTA app partition
+        shell: bash
+        run: |
+          test -s upstream/firmware/build/stack-chan.bin
+          test -s upstream/firmware/build/flasher_args.json
+          test -s upstream/firmware/build/generated_assets.bin
+          python3 - <<'PY'
+          import os
+          p='upstream/firmware/build/stack-chan.bin'
+          size=os.path.getsize(p)
+          print('Application bytes:',size,'partition maximum:',0x4f0000)
+          if size > 0x4f0000:
+              raise SystemExit('Application exceeds original OTA app partition')
+          b=open(p,'rb').read()
+          assert b'ASL Companion' in b, 'ASL menu text absent from firmware'
+          print('ASL Companion app marker confirmed')
+          PY
+          sha256sum upstream/firmware/build/stack-chan.bin
+          grep -q 'learn that ' companion/ahl_memory_service.h
+          grep -q 'MaxNotes = 32' companion/ahl_vector_index.h
+          grep -q 'start learning about me' companion/ahl_memory_service.h
+          grep -q 'ahl.memory.list' upstream/firmware/main/hal/hal.cpp
+          grep -q 'ahl.companion.capabilities' upstream/firmware/main/hal/hal.cpp
+          grep -q 'case Sequence::Talking:return 12;' upstream/firmware/main/apps/app_asl_companion/asl_face_assets.cpp
+          python3 - <<'PY'
+          import hashlib,tarfile
+          old='assets/ASL_Companion_v4_overlay.tar.xz'
+          new='assets/ASL_Companion_v8_face_overlay.tar.xz'
+          changed=[]
+          with tarfile.open(old,'r:xz') as a,tarfile.open(new,'r:xz') as b:
+            da={m.name:a.extractfile(m).read() for m in a if m.isfile()}
+            db={m.name:b.extractfile(m).read() for m in b if m.isfile()}
+          assert da.keys()==db.keys()
+          changed=[k for k in da if da[k]!=db[k]]
+          assert sorted(changed)==[
+            'overlay/firmware/main/apps/app_asl_companion/asl_face_assets.cpp',
+            'overlay/firmware/main/apps/app_asl_companion/asl_face_data.inc'
+          ], changed
+          print('Approved face-only asset change verified; 7 existing resources preserved.')
+          PY
+      - name: Upload full non-flashed firmware files
+        uses: actions/upload-artifact@v4
+        with:
+          name: AHL-StackChan-ASL-v8-New-Face-Animations
+          path: |
+            upstream/firmware/build/*.bin
+            upstream/firmware/build/flash_args
+            upstream/firmware/build/flasher_args.json
+            upstream/firmware/build/bootloader/*.bin
+            upstream/firmware/build/partition_table/*.bin
+          if-no-files-found: error

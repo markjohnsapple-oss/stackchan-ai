@@ -11,8 +11,8 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 UP = ROOT / "upstream/firmware"
-PACKAGE = ROOT / "assets/ASL_Companion_v4_overlay.tar.xz"
-EXPECTED_SHA256 = "634e2c195f37ddca2dc4f208df24c1c3f7eb33429c31866cc00cb6473c03f54a"
+PACKAGE = ROOT / "assets/ASL_Companion_v8_face_overlay.tar.xz"
+EXPECTED_SHA256 = "3e71490585314f41eb991f444b214caf88b3f4b0049cc57326ab3c5875293c53"
 if not PACKAGE.is_file() or hashlib.sha256(PACKAGE.read_bytes()).hexdigest() != EXPECTED_SHA256:
     raise SystemExit("STOP: Approved ASL v4 media archive is missing or altered.")
 version = (UP / "CMakeLists.txt").read_text()
