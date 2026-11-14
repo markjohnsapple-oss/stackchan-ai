@@ -1,0 +1,99 @@
+name: AHL ARLO Bluetooth joystick v2 firmware
+on:
+  push:
+    branches: [ahl/arlo-head-bluetooth-v2-20261114]
+    paths:
+      - .github/workflows/ahl-arlo-head-bluetooth-v2.yml
+      - scripts/make_stackchan_slim_v1.py
+      - scripts/tune_stackchan_slim_v2.py
+      - scripts/arlo_silence_guard.py
+      - scripts/arlo_head_ble_v2.py
+      - controller/ARLO_Head_Control_Bluetooth_v2.html
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout protected ARLO Bluetooth v2 branch
+        uses: actions/checkout@v4
+      - name: Checkout exact verified original StackChan 1.6.2
+        uses: actions/checkout@v4
+        with:
+          repository: m5stack/StackChan
+          ref: 28b9f0c8bd6acd81cb3c70f1a93c3e373b39d400
+          path: upstream
+      - name: Validate direct Bluetooth HTML and embedded script
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('controller/ARLO_Head_Control_Bluetooth_v2.html').read_text()
+          assert 'navigator.bluetooth.requestDevice' in html
+          assert "value=\"0000\"" in html
+          assert "1d96a9ce-8d21-4eeb-8dfd-b9944302a101" in html
+          assert "1d96a9ce-8d21-4eeb-8dfd-b9944302a102" in html
+          assert '8765' not in html and 'id="ip"' not in html
+          script = re.search(r'<script>(.*?)</script>', html, re.S)
+          assert script, 'No Bluetooth script found'
+          Path('/tmp/arlo_bluetooth_controller_v2.js').write_text(script.group(1))
+          PY
+          node --check /tmp/arlo_bluetooth_controller_v2.js
+      - name: Compile original AI with direct Bluetooth joystick and silence guard
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: upstream/firmware
+          command: |
+            set -euo pipefail
+            test -f main/apps/app_ai_agent/app_ai_agent.cpp
+            test -f main/apps/app_espnow_ctrl/app_espnow_ctrl.cpp
+            python3 ../../scripts/make_stackchan_slim_v1.py
+            test ! -e main/apps/app_asl_companion
+            python3 fetch_repos.py
+            python3 ../../scripts/tune_stackchan_slim_v2.py
+            grep -q ahl_handsfree_enabled_ xiaozhi-esp32/main/application.h
+            grep -q AHL_SLIM_V2_MEM xiaozhi-esp32/main/application.cc
+            python3 ../../scripts/arlo_silence_guard.py
+            python3 ../../scripts/arlo_head_ble_v2.py
+            grep -q "ARLO_BLE_V2_READY" /dev/null || true
+            test -f main/hal/arlo_head_ble_control.cc
+            test ! -f main/hal/arlo_head_control.cc
+            idf.py build
+      - name: Verify genuine firmware and original feature markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s upstream/firmware/build/stack-chan.bin
+          test -s upstream/firmware/build/bootloader/bootloader.bin
+          test -s upstream/firmware/build/partition_table/partition-table.bin
+          test -s upstream/firmware/build/ota_data_initial.bin
+          test -s upstream/firmware/build/generated_assets.bin
+          test -s upstream/firmware/build/flasher_args.json
+          python3 - <<'PY'
+          from pathlib import Path
+          raw = Path("upstream/firmware/build/stack-chan.bin").read_bytes()
+          assert len(raw) < 0x4f0000, "STOP: application exceeds original OTA partition"
+          for marker in (b"AI.AGENT", b"ESPNOW.REMOTE", b"ARLO_BLE", b"ARLO Head"):
+              assert marker in raw, "STOP: feature missing: " + repr(marker)
+          assert b"ASL Companion" not in raw, "STOP: unwanted duplicate companion"
+          print("PASS: original AI, existing remote, ARLO BLE 0000 and silence guard.")
+          print("Application size:", len(raw), "bytes")
+          PY
+          sha256sum upstream/firmware/build/stack-chan.bin
+      - name: Upload direct Bluetooth firmware and standalone HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARLO-Bluetooth-Head-v2-Firmware-and-HTML
+          path: |
+            upstream/firmware/build/*.bin
+            upstream/firmware/build/flash_args
+            upstream/firmware/build/flasher_args.json
+            upstream/firmware/build/bootloader/*.bin
+            upstream/firmware/build/partition_table/*.bin
+            controller/ARLO_Head_Control_Bluetooth_v2.html
+          if-no-files-found: error
