@@ -47,31 +47,7 @@ jobs:
             grep -q AHL_SLIM_V2_MEM xiaozhi-esp32/main/application.cc
             python3 ../../scripts/arlo_silence_guard.py
             python3 ../../scripts/arlo_head_joystick_v1.py
-            echo "AHL_DIAG: silence and joystick patches applied at $(date -u +%FT%TZ)"
-            grep -q 'ARLO_SILENCE: quiet connection refresh' xiaozhi-esp32/main/application.cc
-            echo "AHL_DIAG: silence marker present"
-            grep -q 'arlo_head_control_http_start' main/hal/hal.cpp
-            echo "AHL_DIAG: HTTP startup hook present"
-            grep -q 'ARLO_HEAD_CONTROL_V1_READY' ../../scripts/arlo_head_joystick_v1.py
-            echo "AHL_DIAG: joystick patch marker present"
-            grep -q 'esp_http_server' main/CMakeLists.txt
-            echo "AHL_DIAG: HTTP dependency present"
-            echo "AHL_DIAG: entering idf.py build at $(date -u +%FT%TZ)"
-            export PYTHONUNBUFFERED=1
-            # Heartbeat shows whether the compiler is still active without exposing process arguments.
-            (
-              while sleep 45; do
-                echo "AHL_DIAG: compiler heartbeat $(date -u +%FT%TZ)"
-                ps -eo comm,etime,stat,%cpu --sort=-%cpu | head -n 12 || true
-              done
-            ) &
-            heartbeat_pid=$!
-            trap 'kill "$heartbeat_pid" 2>/dev/null || true' EXIT
-            # The entire GitHub job is capped at 15 minutes; fail fast if compilation stalls.
-            timeout --signal=TERM --kill-after=15s 12m stdbuf -oL -eL idf.py build
-            kill "$heartbeat_pid" 2>/dev/null || true
-            trap - EXIT
-            echo "AHL_DIAG: idf.py build succeeded at $(date -u +%FT%TZ)"
+            idf.py build
       - name: Verify real firmware images and strip boundaries
         shell: bash
         run: |
