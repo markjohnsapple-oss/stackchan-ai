@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add a PIN-paired local ARLO head-control HTTP page to verified Slim v2.
+"""Add a PIN-paired ARLO head-control page after network readiness (boot-safe v2).
 
 Builds the smartphone-friendly HTML into the firmware and also ships the same
 HTML as a standalone controller. No change to AI audio, camera or wake-free
@@ -203,26 +203,32 @@ def patch():
         + page + '\n)ARLO_PAGE";\n', encoding="utf-8")
     SOURCE.write_text(CPP, encoding="utf-8")
 
-    s = HAL_CPP.read_text(encoding="utf-8")
-    s = once(s,
-        'void Hal::startXiaozhi()\n{',
-        'void arlo_head_control_http_start();\n\nvoid Hal::startXiaozhi()\n{',
-        "native AI startup declaration")
-    s = once(s,
-        '    hal_bridge::start_xiaozhi_app();',
-        '    // Optional local head joystick uses the existing motor implementation.\n'
-        '    arlo_head_control_http_start();\n'
-        '    hal_bridge::start_xiaozhi_app();',
-        "native AI startup hook")
-    HAL_CPP.write_text(s, encoding="utf-8")
+    # The original Hal::startXiaozhi must NOT start an HTTP server here:
+    # XiaoZhi has not initialised its network stack at that point.
+    # Keep Hal unchanged. Hook only the existing network-connected event.
+    application_cpp = ROOT / "upstream/firmware/xiaozhi-esp32/main/application.cc"
+    native = application_cpp.read_text(encoding="utf-8")
+    native = once(
+        native,
+        'void Application::HandleNetworkConnectedEvent() {\n'
+        '    ahl_network_online_ = true;\n'
+        '    ESP_LOGI(TAG, "Network connected");',
+        'void arlo_head_control_http_start();\n\n'
+        'void Application::HandleNetworkConnectedEvent() {\n'
+        '    ahl_network_online_ = true;\n'
+        '    ESP_LOGI(TAG, "Network connected");\n'
+        '    // ARLO: start the optional joystick only once networking is online.\n'
+        '    arlo_head_control_http_start();',
+        "network-connected joystick startup")
+    application_cpp.write_text(native, encoding="utf-8")
 
     cmake = CMAKE.read_text(encoding="utf-8")
     cmake = once(cmake, '                        esp_http_client\n',
                 '                        esp_http_client\n                        esp_http_server\n',
                 'HTTP server dependency')
     CMAKE.write_text(cmake, encoding="utf-8")
-    print("ARLO_HEAD_CONTROL_V1_READY: Wi-Fi page and local HTTP control with six-digit PIN.")
-    print("No changes to camera, microphone, XiaoZhi, face or existing servo limits.")
+    print("ARLO_HEAD_CONTROL_V2_READY: network-ready HTTP server with six-digit PIN.")
+    print("Original HAL startup unchanged; XiaoZhi network-ready event triggers optional HTTP.")
     print("Rate-limited commands, physical PIN display, narrow test angles and STOP.")
     print("Web page at http://<ARLO-WIFI-IP>:8765/ (or standalone HTML via the same Wi-Fi).")
     print("Motion requires real-device testing with the new humanoid body.")
