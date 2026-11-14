@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#09131e">
+<title>ARLO • Head Control</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#08111b;color:#ecf5fd}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(ellipse at 50% -18%,#163a51 0,#08111b 60%);display:grid;place-items:center;padding:20px}
+main{width:min(100%,460px);background:#0c1b2a;border:1px solid #294658;border-radius:25px;box-shadow:0 24px 70px #0008;overflow:hidden}
+.top{padding:24px 25px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #203746}
+.kicker{letter-spacing:.25em;font-size:11px;color:#7cdbea;font-weight:700}.title{font-size:27px;font-weight:800;letter-spacing:.025em;margin:2px 0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#7a858e;margin-right:6px;box-shadow:0 0 0 4px #ffffff0a}
+.dot.on{background:#5df5ca;box-shadow:0 0 12px #5df5ca} .chip{font-size:12px;color:#b3c8d6;padding:9px 11px;background:#112b3a;border:1px solid #28566a;border-radius:99px;white-space:nowrap}
+.content{padding:20px 24px 25px}.label{display:block;font-size:12px;color:#a8c0ce;margin:13px 0 7px;font-weight:650}
+input{border:1px solid #2b5265;color:white;background:#061521;outline:none;border-radius:12px;min-height:44px;padding:0 13px;width:100%;font-size:16px}
+input:focus-visible,button:focus-visible,.pad:focus-visible{outline:2px solid #72d6ec;outline-offset:2px}
+.grid{display:grid;grid-template-columns:1fr 116px;gap:10px}.row{display:flex;align-items:flex-end;gap:10px}.row input{flex:1}
+button{border:1px solid #39627a;border-radius:12px;background:#113449;color:#d9f4fc;min-height:44px;padding:0 16px;font-size:13px;font-weight:750;cursor:pointer;touch-action:manipulation}
+button:hover{background:#184a65}button:active{transform:scale(.98)}button.primary{background:#1a6b82;border-color:#32a5bc;color:#fff}
+.description{font-size:12px;color:#83a4b7;line-height:1.55;margin:8px 0 0}.status{min-height:42px;padding:13px;background:#091924;border:1px solid #214254;border-radius:10px;color:#a9d1dc;font-size:12px;line-height:1.4;margin:17px 0 12px}
+.joy-title{text-align:center;font-size:13px;font-weight:700;color:#d0eefa;margin:19px 0 3px}
+.joy-sub{text-align:center;color:#7aa9bd;font-size:11px;margin-bottom:16px}
+.pad{position:relative;touch-action:none;width:min(68vw,260px);height:min(68vw,260px);margin:auto;border-radius:50%;background:radial-gradient(circle,#123044 0 18%,#0c2535 18% 48%,#0b1b2b 49% 70%,#0d2b3b 71%);border:2px solid #2e6d82;box-shadow:inset 0 0 55px #061017,0 0 30px #0ecce012;cursor:crosshair;user-select:none}
+.pad::before,.pad::after{content:"";position:absolute;pointer-events:none;background:#366478}.pad::before{height:1px;left:12%;right:12%;top:50%}.pad::after{width:1px;top:12%;bottom:12%;left:50%}
+.thumb{width:76px;height:76px;background:radial-gradient(circle at 35% 30%,#76f3f4,#1b7797 64%,#124359);border:2px solid #abfaff;border-radius:50%;box-shadow:0 6px 22px #0009,0 0 22px #11e6e088;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;transition:box-shadow .15s}
+.pad.active .thumb{box-shadow:0 7px 24px #000b,0 0 32px #2cf9df}
+.direction{position:absolute;pointer-events:none;color:#8bbcc8;font-size:13px;font-weight:800}
+.up{top:12px;left:50%;transform:translateX(-50%)}.down{bottom:11px;left:50%;transform:translateX(-50%)}.left{left:12px;top:50%;transform:translateY(-50%)}.right{right:12px;top:50%;transform:translateY(-50%)}
+.actions{display:flex;gap:12px;margin-top:20px}.actions button{flex:1}
+.readout{text-align:center;font-variant-numeric:tabular-nums;font-size:12px;color:#a5c6d5;margin-top:12px}
+footer{text-align:center;font-size:11px;color:#7794a1;padding:15px 14px;background:#081621;border-top:1px solid #203746}
+@media(max-width:365px){.content{padding:16px}.top{padding:20px 18px}.title{font-size:22px}.thumb{width:62px;height:62px}}
+</style>
+</head>
+<body>
+<main aria-label="ARLO head controller">
+<header class="top"><div><div class="kicker">ARCADE HOME LABS</div><h1 class="title">ARLO <span style="color:#8be5ea">/</span> Head</h1></div><div class="chip"><span id="dot" class="dot"></span><span id="connection">Not paired</span></div></header>
+<div class="content">
+<label class="label" for="ip">ARLO'S WI-FI ADDRESS</label>
+<div class="grid"><input id="ip" placeholder="192.168.1.123" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false"><button id="request" class="primary">Pair</button></div>
+<p class="description">Use the same Wi-Fi as ARLO. Tap Pair, then read the six-digit code on his face.</p>
+<label class="label" for="pin">CODE SHOWN ON ARLO</label>
+<div class="row"><input id="pin" placeholder="6-digit code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"><button id="test">Connect</button></div>
+<div id="status" class="status" role="status" aria-live="polite">Enter ARLO's Wi-Fi address to begin.</div>
+<div class="joy-title">HEAD JOYSTICK</div><div class="joy-sub">Touch and hold to look around • release to stop</div>
+<div id="pad" class="pad" role="slider" tabindex="0" aria-label="Move ARLO's head. Use the arrow keys or drag." aria-valuemin="-25" aria-valuemax="25" aria-valuenow="0" aria-disabled="true">
+<span class="direction up">▲</span><span class="direction down">▼</span><span class="direction left">◀</span><span class="direction right">▶</span><div id="thumb" class="thumb"></div></div>
+<div id="readout" class="readout">Yaw 0° · Pitch 18°</div>
+<div class="actions"><button id="home">Centre head</button><button id="stop">STOP</button></div>
+<p class="description">Movement limited to a gentle test range: ±25° left/right and 5–30° up/down. Keep hands and loose wires clear.</p>
+</div>
+<footer>LOCAL CONTROL ONLY · NO CLOUD · ARLO BRAIN PROTOTYPE v1</footer>
+</main>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const ip=$('ip'), pin=$('pin'),pad=$('pad'),thumb=$('thumb'),status=$('status'),readout=$('readout');
+let paired=false, active=false, xy={x:0,y:0}, lastSent=0, moving=false;
+const setStatus=(message,ok=false)=>{status.textContent=message; $('connection').textContent=ok?'Connected':'Not paired'; $('dot').classList.toggle('on',ok);pad.setAttribute('aria-disabled',String(!ok));};
+function base(){
+ const v=ip.value.trim();
+ if(!/^(?:(?:\d{1,3}\.){3}\d{1,3}|[a-z0-9-]+(?:\.[a-z0-9-]+)*)$/i.test(v)) throw Error('Enter ARLO’s Wi-Fi IP address, for example 192.168.1.123');
+ if(v.split('.').length===4 && v.split('.').some(x=>Number(x)>255)) throw Error('That IP address is not valid.');
+ return 'http://'+v+':8765';
+}
+async function call(route,data={},auth=true){
+ const headers={'Content-Type':'application/json'};
+ if(auth){
+  if(!/^\d{6}$/.test(pin.value.trim())) throw Error('Enter the six-digit pairing code from ARLO.');
+  headers['X-ARLO-PIN']=pin.value.trim();
+ }
+ const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),3500);
+ try{
+  const res=await fetch(base()+route,{method:'POST',headers,body:JSON.stringify(data),signal:ctrl.signal,cache:'no-store'});
+  const parsed=await res.json().catch(()=>({error:'Unexpected robot response'}));
+  if(!res.ok || parsed.ok===false) throw Error(parsed.error||'Robot refused command ('+res.status+')');
+  return parsed;
+ }catch(err){if(err.name==='AbortError')throw Error('Connection timed out. Check ARLO’s Wi-Fi address.');throw err;}
+ finally{clearTimeout(timer);}
+}
+function resetThumb(){xy={x:0,y:0};thumb.style.left='50%';thumb.style.top='50%';readout.textContent='Yaw 0° · Pitch 18°';pad.setAttribute('aria-valuenow','0');}
+async function stop(){
+ active=false;moving=false;pad.classList.remove('active');resetThumb();
+ if(!paired)return;
+ try{await call('/arlo/stop');}catch(err){setStatus(err.message,false);paired=false;}
+}
+$('request').addEventListener('click',async()=>{
+ try{await call('/arlo/pair',{},false);paired=false;setStatus('Check ARLO’s screen for the pairing code. Enter it below, then tap Connect.');}
+ catch(err){setStatus(err.message);}
+});
+$('test').addEventListener('click',async()=>{
+ try{await call('/arlo/test');paired=true;setStatus('Paired. ARLO is ready for gentle head control.',true);}
+ catch(err){paired=false;setStatus(err.message);}
+});
+async function move(force=false){
+ if(!paired||!active)return;
+ const now=performance.now();if(!force && now-lastSent<150)return;
+ lastSent=now;
+ const yaw=Math.round(xy.x*25), pitch=Math.round(17.5-xy.y*12.5);
+ readout.textContent='Yaw '+yaw+'° · Pitch '+pitch+'°';
+ try{await call('/arlo/move',{yaw,pitch});}catch(err){active=false;paired=false;setStatus(err.message);resetThumb();}
+}
+function position(event){
+ const rect=pad.getBoundingClientRect(),radius=rect.width*.35;
+ let x=(event.clientX-(rect.left+rect.width/2))/radius;
+ let y=(event.clientY-(rect.top+rect.height/2))/radius;
+ const magnitude=Math.hypot(x,y);if(magnitude>1){x/=magnitude;y/=magnitude;}
+ xy={x,y};
+ thumb.style.left=(50+x*35)+'%';thumb.style.top=(50+y*35)+'%';
+ pad.setAttribute('aria-valuenow',String(Math.round(x*25)));
+ move();
+}
+pad.addEventListener('pointerdown',ev=>{
+ if(!paired){setStatus('Pair ARLO first.');return;}
+ active=true;moving=true;pad.classList.add('active');pad.setPointerCapture(ev.pointerId);position(ev);move(true);
+});
+pad.addEventListener('pointermove',ev=>{if(active)position(ev);});
+pad.addEventListener('pointerup',stop);pad.addEventListener('pointercancel',stop);
+window.addEventListener('blur',()=>{if(active)stop();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden && active)stop();});
+$('stop').addEventListener('click',stop);
+$('home').addEventListener('click',async()=>{
+ if(!paired){setStatus('Pair ARLO first.');return;}
+ active=false;resetThumb();
+ try{await call('/arlo/move',{yaw:0,pitch:18});setStatus('Head centred.',true);}
+ catch(err){paired=false;setStatus(err.message);}
+});
+pad.addEventListener('keydown',ev=>{
+ if(!paired)return;
+ const steps={ArrowLeft:[-0.15,0],ArrowRight:[0.15,0],ArrowUp:[0,-0.15],ArrowDown:[0,0.15]};
+ if(steps[ev.key]){ev.preventDefault();const [dx,dy]=steps[ev.key];xy={x:Math.max(-1,Math.min(1,xy.x+dx)),y:Math.max(-1,Math.min(1,xy.y+dy))};active=true;position({clientX:pad.getBoundingClientRect().left+pad.clientWidth/2+xy.x*pad.clientWidth*.35,clientY:pad.getBoundingClientRect().top+pad.clientHeight/2+xy.y*pad.clientHeight*.35});}
+});
+pad.addEventListener('keyup',ev=>{if(ev.key.startsWith('Arrow'))stop();});
+try{const previous=localStorage.getItem('arlo-head-ip');if(previous)ip.value=previous;ip.addEventListener('change',()=>localStorage.setItem('arlo-head-ip',ip.value.trim()));}catch{}
+})();
+</script>
+</body>
+</html>
