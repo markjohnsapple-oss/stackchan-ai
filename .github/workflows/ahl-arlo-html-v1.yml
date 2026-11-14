@@ -1,0 +1,36 @@
+name: ARLO HTML head controller standalone download
+on:
+  push:
+    branches: [ahl/arlo-head-joystick-v1-20261114]
+    paths:
+      - .github/workflows/ahl-arlo-html-v1.yml
+      - controller/ARLO_Head_Control_v1.html
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package-html:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check complete HTML and joystick commands
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('controller/ARLO_Head_Control_v1.html')
+          s=p.read_text()
+          checks=['<!doctype html>','</html>','/arlo/pair','/arlo/test','/arlo/move','/arlo/stop','pointerdown','pointerup','X-ARLO-PIN','Yaw','Pitch']
+          for c in checks:
+              assert c in s, c
+          js=re.search(r'<script>(.*?)</script>',s,re.S).group(1)
+          Path('/tmp/arlo_controller.js').write_text(js)
+          print('PASS: ARLO standalone HTML and endpoints present; bytes:',p.stat().st_size)
+          PY
+          node --check /tmp/arlo_controller.js
+      - name: Upload standalone HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARLO-Head-Control-v1-HTML
+          path: controller/ARLO_Head_Control_v1.html
+          if-no-files-found: error
