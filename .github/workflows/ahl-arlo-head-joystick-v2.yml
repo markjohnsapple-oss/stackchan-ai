@@ -50,7 +50,7 @@ jobs:
             # Fail build if optional HTTP starts before XiaoZhi initialises networking.
             test -s main/hal/arlo_head_control.cc
             ! grep -q arlo_head_control_http_start main/hal/hal.cpp
-            grep -q 'arlo_head_control_http_start();' xiaozhi-esp32/main/application.cc
+            grep -Fq "arlo_head_control_http_start();" xiaozhi-esp32/main/application.cc
             idf.py build
       - name: Verify real firmware images and strip boundaries
         shell: bash
