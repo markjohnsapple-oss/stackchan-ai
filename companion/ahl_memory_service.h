@@ -12,10 +12,12 @@
 namespace ahl {
 class MemoryService {
 public:
-    enum class Command : uint8_t { None, Saved, Full, Cleared, Failed };
+    enum class Command : uint8_t { None, Saved, Full, Cleared, Failed, LearningOn, LearningOff };
     Command processExplicitUtterance(const std::string& utterance) {
         std::string text = trim(utterance);
         const std::string lowered = lowerAscii(text);
+        if (lowered == "start learning about me" || lowered == "enable learning") return setLearning(true);
+        if (lowered == "stop learning about me" || lowered == "disable learning") return setLearning(false);
         if (lowered == "forget all companion memories" ||
             lowered == "forget everything i taught you") return eraseAll();
         const char* prefixes[] = {"remember that ", "please remember that ",
@@ -27,7 +29,28 @@ public:
             const std::string candidate=p;
             if (lowered.rfind(candidate,0)==0) { prefix=candidate.size(); break; }
         }
-        if (!prefix) return Command::None;
+        if (!prefix) {
+            // Opt-in only; never keep arbitrary transcripts or camera data.
+            const char* starters[] = {"my name is ", "my favourite ", "my favorite ",
+                                      "i enjoy ", "i like ", "i prefer ",
+                                      "i am working on ", "i'm working on "};
+            bool personal_fact = false;
+            for (const char* p : starters) {
+                if (lowered.rfind(p, 0) == 0) { personal_fact = true; break; }
+            }
+            if (!personal_fact) return Command::None;
+            {
+                std::lock_guard<std::mutex> guard(mutex_);
+                if (!loadLocked() || !learning_enabled_) return Command::None;
+            }
+            const char* blocked[] = {"password", "passcode", "pin number", "credit card",
+                                     "bank account", "address", "passport", "medical",
+                                     "medication", "diagnos", "health", "secret key",
+                                     "api key", "private key"};
+            for (const char* word : blocked) {
+                if (lowered.find(word) != std::string::npos) return Command::None;
+            }
+        }
         const std::string note = trim(text.substr(prefix));
         if (note.empty() || note.size()>VectorNoteIndex::MaxTextBytes ||
             note.find('\n')!=std::string::npos || note.find('\r')!=std::string::npos) return Command::Failed;
@@ -55,6 +78,26 @@ public:
         std::lock_guard<std::mutex> guard(mutex_);
         return loadLocked()?index_.size():0;
     }
+    std::string list(size_t max_items=8) {
+        std::lock_guard<std::mutex> guard(mutex_);
+        if (!loadLocked()) return "Memory unavailable";
+        if (!index_.size()) return "No personal facts saved";
+        std::string out = "Saved personal facts (" + std::to_string(index_.size()) + " total):";
+        const size_t limit = index_.size() < max_items ? index_.size() : max_items;
+        for (size_t i=0; i<limit; ++i) {
+            out += "\n" + std::to_string(i+1) + ". " + index_.get(i);
+        }
+        if (limit < index_.size()) out += "\nMore facts saved; search for a particular topic.";
+        return out;
+    }
+    std::string status() {
+        std::lock_guard<std::mutex> guard(mutex_);
+        if (!loadLocked()) return "Memory unavailable";
+        return "Personal facts saved: " + std::to_string(index_.size()) +
+               " of " + std::to_string(VectorNoteIndex::MaxNotes) +
+               "; natural learning: " + (learning_enabled_ ? "ON" : "OFF") +
+               ". Learning is stored locally and never keeps raw speech or photographs.";
+    }
     Command eraseAll() {
         std::lock_guard<std::mutex> guard(mutex_);
         nvs_handle_t h=0;
@@ -64,13 +107,26 @@ public:
         if(error==ESP_OK)error=nvs_commit(h);
         nvs_close(h);
         if(error!=ESP_OK)return Command::Failed;
-        index_.clear(); loaded_=true;
+        index_.clear(); loaded_=true; learning_enabled_=false;
         return Command::Cleared;
     }
 private:
     std::mutex mutex_;
     VectorNoteIndex index_;
     bool loaded_=false;
+    bool learning_enabled_=false;
+    Command setLearning(bool enabled) {
+        std::lock_guard<std::mutex> guard(mutex_);
+        if (!loadLocked()) return Command::Failed;
+        nvs_handle_t h=0;
+        if (nvs_open("ahl_notes_v1",NVS_READWRITE,&h)!=ESP_OK) return Command::Failed;
+        const bool saved=nvs_set_u8(h,"learn",enabled?1:0)==ESP_OK &&
+                         nvs_commit(h)==ESP_OK;
+        nvs_close(h);
+        if (!saved) return Command::Failed;
+        learning_enabled_=enabled;
+        return enabled?Command::LearningOn:Command::LearningOff;
+    }
     static std::string lowerAscii(std::string text) {
         for(char& c:text){auto u=static_cast<unsigned char>(c);if(u<128)c=static_cast<char>(std::tolower(u));}
         return text;
@@ -87,6 +143,8 @@ private:
         auto error=nvs_open("ahl_notes_v1",NVS_READONLY,&h);
         if(error==ESP_ERR_NVS_NOT_FOUND){loaded_=true;return true;}
         if(error!=ESP_OK)return false;
+        uint8_t learn=0;
+        if(nvs_get_u8(h,"learn",&learn)==ESP_OK) learning_enabled_=(learn==1);
         VectorNoteIndex temp;
         for(size_t i=0;i<VectorNoteIndex::MaxNotes;i++) {
             char key[12];std::snprintf(key,sizeof(key),"note%02u",static_cast<unsigned>(i));
