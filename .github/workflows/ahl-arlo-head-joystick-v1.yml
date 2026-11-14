@@ -1,0 +1,97 @@
+name: AHL ARLO head joystick and silence fix firmware
+on:
+  push:
+    branches: [ahl/arlo-head-joystick-v1-20261114]
+    paths:
+      - .github/workflows/ahl-arlo-head-joystick-v1.yml
+      - scripts/make_stackchan_slim_v1.py
+      - scripts/tune_stackchan_slim_v2.py
+      - scripts/arlo_silence_guard.py
+      - scripts/arlo_head_joystick_v1.py
+      - controller/ARLO_Head_Control_v1.html
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout protected Arcade Home Labs branch
+        uses: actions/checkout@v4
+      - name: Checkout exact original StackChan 1.6.2
+        uses: actions/checkout@v4
+        with:
+          repository: m5stack/StackChan
+          ref: 28b9f0c8bd6acd81cb3c70f1a93c3e373b39d400
+          path: upstream
+      - name: Compile original AI after removing unused apps and duplicate Companion
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: upstream/firmware
+          command: |
+            set -euo pipefail
+            echo "AHL Slim v1 build directory $(pwd)"
+            test -f ../../scripts/make_stackchan_slim_v1.py
+            test -f main/apps/app_ai_agent/app_ai_agent.cpp
+            test -f main/apps/app_espnow_ctrl/app_espnow_ctrl.cpp
+            test -f main/apps/app_setup/app_setup.cpp
+            python3 ../../scripts/make_stackchan_slim_v1.py
+            test ! -e main/apps/app_asl_companion
+            python3 fetch_repos.py
+            python3 ../../scripts/tune_stackchan_slim_v2.py
+            grep -q ahl_handsfree_enabled_ xiaozhi-esp32/main/application.h
+            grep -q ahl_wake_model_enabled xiaozhi-esp32/main/audio/engines/afe_audio_engine.cc
+            grep -q AHL_SLIM_V2_MEM xiaozhi-esp32/main/application.cc
+            python3 ../../scripts/arlo_silence_guard.py
+            python3 ../../scripts/arlo_head_joystick_v1.py
+            grep -q 'ARLO_SILENCE: quiet connection refresh' xiaozhi-esp32/main/application.cc
+            grep -q 'arlo_head_control_http_start' main/hal/hal.cpp
+            grep -q 'ARLO_HEAD_CONTROL_V1_READY' ../../scripts/arlo_head_joystick_v1.py
+            grep -q 'esp_http_server' main/CMakeLists.txt
+            idf.py build
+      - name: Verify real firmware images and strip boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s upstream/firmware/build/stack-chan.bin
+          test -s upstream/firmware/build/bootloader/bootloader.bin
+          test -s upstream/firmware/build/partition_table/partition-table.bin
+          test -s upstream/firmware/build/ota_data_initial.bin
+          test -s upstream/firmware/build/generated_assets.bin
+          test -s upstream/firmware/build/flasher_args.json
+          python3 - <<'PY'
+          from pathlib import Path
+          firmware = Path("upstream/firmware/build/stack-chan.bin")
+          raw = firmware.read_bytes()
+          size = firmware.stat().st_size
+          print("ARLO joystick firmware application bytes:", size)
+          print("Unmodified v9 firmware baseline: 4253744 bytes")
+          print("Space saved:", 4253744 - size, "bytes")
+          if size >= 0x4f0000:
+              raise SystemExit("STOP: exceeds preserved OTA app partition")
+          if b"ASL Companion" in raw:
+              raise SystemExit("STOP: ASL overlay unexpectedly in slim firmware")
+          if b"AI.AGENT" not in raw:
+              raise SystemExit("STOP: factory AI recovery app missing")
+          if b"ESPNOW.REMOTE" not in raw:
+              raise SystemExit("STOP: ESP-NOW Remote app missing")
+          if size >= 4253744:
+              raise SystemExit("STOP: slim binary did not shrink against v9")
+          print("PASS: original AI, camera and remote, PIN-paired joystick, quiet session guard.")
+          PY
+          sha256sum upstream/firmware/build/stack-chan.bin
+      - name: Upload firmware images without flashing user hardware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARLO-Head-Joystick-v1-Firmware-and-HTML
+          path: |
+            upstream/firmware/build/*.bin
+            upstream/firmware/build/flash_args
+            upstream/firmware/build/flasher_args.json
+            upstream/firmware/build/bootloader/*.bin
+            upstream/firmware/build/partition_table/*.bin
+            controller/ARLO_Head_Control_v1.html
+          if-no-files-found: error
