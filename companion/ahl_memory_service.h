@@ -15,7 +15,11 @@ public:
     enum class Command : uint8_t { None, Saved, Full, Cleared, Failed, LearningOn, LearningOff };
     Command processExplicitUtterance(const std::string& utterance) {
         std::string text = trim(utterance);
-        const std::string lowered = lowerAscii(text);
+        std::string lowered = lowerAscii(text);
+        // STT often inserts end punctuation in spoken commands.
+        while (!lowered.empty() &&
+               (lowered.back()=='.' || lowered.back()=='!' || lowered.back()=='?'))
+            lowered.pop_back();
         if (lowered == "start learning about me" || lowered == "enable learning") return setLearning(true);
         if (lowered == "stop learning about me" || lowered == "disable learning") return setLearning(false);
         if (lowered == "forget all companion memories" ||
