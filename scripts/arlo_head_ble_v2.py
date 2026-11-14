@@ -15,6 +15,7 @@ CPP = r'''// ARLO direct Bluetooth head joystick, independent of Wi-Fi and cloud
 #include <host/ble_hs.h>
 #include <host/ble_gap.h>
 #include <host/ble_hs_id.h>
+#include <host/util/util.h>
 #include <host/ble_uuid.h>
 #include <services/gap/ble_svc_gap.h>
 #include <services/gatt/ble_svc_gatt.h>
