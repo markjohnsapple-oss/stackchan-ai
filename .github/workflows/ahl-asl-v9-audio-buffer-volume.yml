@@ -2,7 +2,7 @@ name: AHL ASL Companion v9 smoother speech and max clean volume
 on:
   push:
     branches: [ahl/asl-v9-audio-buffer-volume-20261114]
-    paths: [.github/workflows/ahl-asl-v9-audio-buffer-volume.yml]
+    paths: [.github/workflows/ahl-asl-v9-audio-buffer-volume.yml, scripts/tune_asl_audio_v9.py]
   workflow_dispatch:
 permissions:
   contents: read
