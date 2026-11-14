@@ -59,9 +59,15 @@ def apply():
         cc, '#include "audio_service.h"\n',
         '#include "audio_service.h"\n#include <chrono>\n',
         "timer header")
-    # Wait at most 90ms for >=3 predecoded frames before draining an empty-to-
-    # active queue. Also limits stutters after a network underrun. Never block
-    # until 3 frames unconditionally: very short utterances must still play.
+    # Prebuffer once per audio decoder generation, not before every PCM frame.
+    # Otherwise a 90ms wait on each 60ms frame could introduce new stutters.
+    cc = replace_once(
+        cc,
+        "void AudioService::AudioOutputTask() {\n    while (true) {",
+        "void AudioService::AudioOutputTask() {\n"
+        "    uint32_t prebuffered_generation = static_cast<uint32_t>(-1);\n"
+        "    while (true) {",
+        "one-time playback generation state")
     cc = replace_once(
         cc,
         """        if (service_stopped_.load()) {
@@ -69,16 +75,22 @@ def apply():
         }
 
         auto task = std::move(audio_playback_queue_.front());""",
-        """        // AHL v9: small finite prebuffer on stream start/packet underrun.
-        // The condition-variable releases its mutex while decoders fill the queue.
-        if (!service_stopped_.load() && audio_playback_queue_.size() < 3) {
-            audio_queue_cv_.wait_for(
-                lock, std::chrono::milliseconds(90), [this]() {
-                    return service_stopped_.load() || audio_playback_queue_.size() >= 3;
-                });
+        """        // AHL v9: prebuffer at most once when each voice segment starts.
+        // Never wait 90ms before every frame: that would itself cause stutter.
+        if (prebuffered_generation != playback_generation_) {
+            prebuffered_generation = playback_generation_;
+            if (!service_stopped_.load() && audio_playback_queue_.size() < 3) {
+                audio_queue_cv_.wait_for(
+                    lock, std::chrono::milliseconds(90), [this]() {
+                        return service_stopped_.load() || audio_playback_queue_.size() >= 3;
+                    });
+            }
         }
         if (service_stopped_.load()) {
             break;
+        }
+        if (audio_playback_queue_.empty()) {
+            continue;  // ResetDecoder may have cleared the queue during wait.
         }
 
         auto task = std::move(audio_playback_queue_.front());""",
