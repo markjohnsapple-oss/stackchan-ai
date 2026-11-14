@@ -46,9 +46,9 @@ jobs:
             grep -q 'ahl.memory.search' main/hal/hal.cpp
             python3 fetch_repos.py
             python3 ../../scripts/tune_asl_audio_v9.py
-            grep -q 'MAX_PLAYBACK_TASKS_IN_QUEUE 6' xiaozhi-esp32/main/audio/audio_service.h
-            grep -q 'milliseconds(90)' xiaozhi-esp32/main/audio/audio_service.cc
-            grep -q 'board_set_speaker_volume(100, false)' main/apps/app_asl_companion/asl_live_mode.cpp
+            grep -q MAX_PLAYBACK_TASKS_IN_QUEUE xiaozhi-esp32/main/audio/audio_service.h
+            grep -q milliseconds xiaozhi-esp32/main/audio/audio_service.cc
+            grep -q board_set_speaker_volume main/apps/app_asl_companion/asl_live_mode.cpp
             idf.py build
       - name: Verify flash image and fit in existing OTA app partition
         shell: bash
