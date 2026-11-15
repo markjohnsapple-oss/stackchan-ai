@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Add direct BLE head control to pinned verified Slim v2 after ARLO silence guard.
+"""Add direct BLE head control after the native AI network and protocol startup.
 Keeps original AI, microphone, camera, menu, servo limits and memory tuning.
-Does not add a Wi-Fi or HTTP controller. Four-digit code is app-level, not OS pairing.
+Does not add a Wi-Fi or HTTP controller. Keeps BLE commands and limits identical.
 """
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,14 +160,25 @@ def once(source, old, new, label):
     return source.replace(old, new, 1)
 
 def patch():
-    file = HAL / "hal.cpp"
+    # Start Bluetooth only once the original XiaoZhi network activation and
+    # protocol initialisation have had priority. Previously, NimBLE was
+    # initialised before Application::Initialize / board.StartNetwork.
+    # Preserve the manufacturer's Hal::startXiaozhi unchanged.
+    file = ROOT / "upstream/firmware/xiaozhi-esp32/main/application.cc"
     source = file.read_text(encoding="utf-8")
-    source = once(source, "void Hal::startXiaozhi()\n{",
-                  "void arlo_head_ble_start();\n\nvoid Hal::startXiaozhi()\n{", "AI startup")
-    source = once(source, "    hal_bridge::start_xiaozhi_app();",
-                  "    // Dedicated BLE controller starts without changing native XiaoZhi.\n"
-                  "    arlo_head_ble_start();\n    hal_bridge::start_xiaozhi_app();",
-                  "AI launch hook")
+    source = once(
+        source,
+        'void Application::HandleActivationDoneEvent() {\n'
+        '    ahl_activation_ready_ = true;\n'
+        '    ESP_LOGI(TAG, "Activation done");',
+        'void arlo_head_ble_start();\n\n'
+        'void Application::HandleActivationDoneEvent() {\n'
+        '    ahl_activation_ready_ = true;\n'
+        '    ESP_LOGI(TAG, "Activation done");\n'
+        '    // Native Wi-Fi setup and AI protocol initialisation already finished.\n'
+        '    // Start optional BLE joystick here, not before network setup.\n'
+        '    arlo_head_ble_start();',
+        "post-activation BLE startup")
     file.write_text(source, encoding="utf-8")
     (HAL / "arlo_head_ble_control.cc").write_text(CPP, encoding="utf-8")
     cmake = MAIN / "CMakeLists.txt"
@@ -176,8 +187,8 @@ def patch():
         raise RuntimeError("STOP: existing ESP NimBLE component missing")
     if "CONFIG_BT_NIMBLE_ENABLED=y" not in (ROOT / "upstream/firmware/sdkconfig.defaults").read_text():
         raise RuntimeError("STOP: BLE not enabled in pinned original")
-    print("ARLO_BLE_V2_READY: new direct BLE head controller, app code 0000.")
-    print("Original camera, voice, AI, menu and servo ranges preserved.")
+    print("ARLO_BLE_V3_AI_FIRST_READY: original network and AI protocol initialise before Bluetooth.")
+    print("Original Hal startup, Wi-Fi, camera, audio and BLE commands/servo limits preserved.")
 
 if __name__ == "__main__":
     patch()
