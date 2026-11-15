@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   firmware:
     runs-on: ubuntu-24.04
@@ -59,6 +60,45 @@ jobs:
             test ! -f main/hal/arlo_head_control.cc
             test ! -f main/hal/arlo_head_ble_control.cc
             idf.py build
+      - name: Retrieve installed Slim v1 reference firmware images
+        uses: actions/download-artifact@v4
+        with:
+          name: AHL-StackChan-Slim-v1-Original-AI
+          run-id: 43598581775
+          repository: markjohnsapple-oss/stackchan-ai
+          github-token: ${{ github.token }}
+          path: original_slim_v1
+      - name: Restore exact original bootloader, partitions, artwork and flash manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          from shutil import copyfile
+          source=Path('original_slim_v1')
+          build=Path('upstream/firmware/build')
+          expected={
+              'bootloader/bootloader.bin':'68194a7d513bcc959f09bceb813f273c8e9be6b42a67ebebf496247a6dd4b9ef',
+              'partition_table/partition-table.bin':'48da0866f56d9d8eb1fe786412984d8f1a4a01b3f13f965621fcb916761e1a4b',
+              'ota_data_initial.bin':'7d2c7ac4888bfd75cd5f56e8d61f69595121183afc81556c876732fd3782c62f',
+              'generated_assets.bin':'9965009834abdfde71d01ffa64f909ae4ac456aecaa956f33730630210e3a65e',
+              'flash_args':'4f8ad49aa34891be289fdeb228c2240377f5ce72961562574e8babcedbb7c6e3',
+              'flasher_args.json':'2210985b6da335f3a7cd21e8a93f67478ffbfed8d3764335404f3c5bc0581ec3',
+              'stack-chan.bin':'f89fc5f77c1b8bf6bb3c1318a7db26d33aa98258fb034b71bd385c73591071ef'
+          }
+          for name,digest in expected.items():
+              src=source/name
+              if not src.is_file() or sha256(src.read_bytes()).hexdigest()!=digest:
+                  raise SystemExit('STOP: original Slim v1 artifact mismatch: '+name)
+          for name in expected:
+              if name=='stack-chan.bin':
+                  continue  # Keep our newly compiled ARLO application.
+              dest=build/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              copyfile(source/name,dest)
+          print('PASS: preserved six original supporting files byte for byte.')
+          PY
       - name: Verify original firmware supporting images BYTE IDENTICAL to installed Slim v1
         shell: bash
         run: |
