@@ -1,16 +1,18 @@
-# ARLO Silent Farewell Firmware
+# ARLO Silent Goodbye v2 | Firmware Release Notes
 
-## Verified master preserved
-Builds on the successful ARLO Slim v1 wake-free / on-device name branch and the exact Slim v1 bootloader, partition table, OTA metadata, flash manifests and generated assets. The newly compiled app is the only flash image changed.
+## Base preserved
+Build is based on the successful ARLO Slim v1 hands-free and naming firmware. It keeps the original Slim v1 manufacturer bootloader, partitions, generated artwork, OTA metadata and flash manifests unchanged and hash-verified. All saved settings, Wi-Fi pairing, user personality and NVS remain untouched.
 
-## Firmware adjustment
-The server may produce an unprompted goodbye after inactivity. In the XiaoZhi server protocol, ordinary conversation replies normally follow an STT (recognised user speech) message, while its idle end_prompt produces TTS without new STT. This build identifies TTS that starts at least 20 seconds after the preceding reply/session start **without fresh STT**, and suppresses both its audio and on-screen subtitle. The native AI then continues or reopens according to the original existing logic. No new timers, threads, sensors, HTTP servers, or custom AI components.
+## One correction
+The first silent-goodbye experiment was unsuccessful on the user's physical ARLO because it tried to identify a server-generated TTS farewell after it started. The experimental filter has now been replaced, not stacked.
 
-## Preserved
-Existing ARLO boot/launcher identity, wake-free listening, Wi-Fi and OTA, original cloud and microphone audio, camera and MCP tools, motors, face, memory/NVS, setup and ESP-NOW recovery.
+The updated implementation uses the existing XiaoZhi voice channel and its VAD. After 18 seconds of *genuine inactivity* while in listening mode and with playback drained, ARLO closes the idle cloud audio channel **before** the hosted server's roughly 30-second goodbye could arrive. His existing hands-free logic automatically opens another session. Actual voice input, normal AI speech and camera/motor behaviour remain enabled. This can introduce a brief connection pause during idle transitions.
 
-## Testing and limits
-GitHub validates compile, image hashes and feature markers. Real-world farewell suppression and ordinary conversation quality must be verified on the physical ARLO. Third-party cloud behavior may vary; a server that emits unsolicited TTS with a synthetic STT or within 20 seconds cannot be perfectly distinguished from normal replies by this rule. No cloud account settings have been modified.
+## Scope
+No changes to the cloud service address, OTA, identity, Wi-Fi, camera, servos, speech decoder, TTS, or user settings. No added server, Bluetooth or background task. On-device name ARLO and wake-free conversation remain.
 
-## Installation
-Use the same five-image flash offsets and settings as the working master. Do not ERASE NVS. Keep the previous successful ARLO ZIP for rollback.
+## Test
+GitHub checks compile and binary integrity; the new idle behavior and sound must still be confirmed on ARLO's physical hardware. Test (1) an ordinary voice conversation, (2) at least 60 seconds of silence, (3) responsiveness when speaking again. If there is a reconnect pause or farewell speech persists, preserve the results for further investigation rather than assuming success.
+
+## Flashing
+Same five binaries, addresses and 80 MHz / DIO / 16 MB settings as the installed ARLO package. Do not erase NVS. Keep the previously working package for rollback.
