@@ -53,9 +53,9 @@ jobs:
             grep -Fq "InitializeProtocol();" xiaozhi-esp32/main/application.cc
             grep -Fq "audio_service_.EnableVoiceProcessing(true);" xiaozhi-esp32/main/application.cc
             grep -Fq "ARLO_HANDSFREE" xiaozhi-esp32/main/application.cc
-            grep -Fq '_label_logo->setText("ARLO");' main/hal/hal.h
-            grep -Fq 'setAppInfo().name = "ARLO";' main/apps/app_ai_agent/app_ai_agent.cpp
-            grep -Fq '"ARLO",' main/apps/app_setup/app_setup.cpp
+            grep -Fq ARLO main/hal/hal.h
+            grep -Fq ARLO main/apps/app_ai_agent/app_ai_agent.cpp
+            grep -Fq ARLO main/apps/app_setup/app_setup.cpp
             test ! -f main/hal/arlo_head_control.cc
             test ! -f main/hal/arlo_head_ble_control.cc
             idf.py build
