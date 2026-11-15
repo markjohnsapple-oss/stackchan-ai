@@ -72,6 +72,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # ESP-IDF builds inside a root-owned Docker container. Transfer only
+          # compiled build-directory ownership to the runner for safe packaging.
+          sudo chown -R "$(id -u):$(id -g)" upstream/firmware/build
           python3 - <<'PY'
           from hashlib import sha256
           from pathlib import Path
